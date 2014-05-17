@@ -88,15 +88,19 @@ interrupted() {
 # parse args
 while :; do
     case $1 in
-        -t) TIMEOUT=$2 && shift || usage;;
-        -i) INTERVAL=$2 && shift || usage;;
+        -t) TIMEOUT=$2; shift;;
+        -i) INTERVAL=$2; shift;;
         -v) VERBOSE=1;;
         -h) help;;
-        '') usage;;
+        -* | '') usage;;
         *) break;;
     esac
     shift
 done
+
+# validate parameters
+(( $TIMEOUT > 0 )) || usage
+(( $INTERVAL > 0 )) || usage
 
 # set traps
 trap clean_up 0
