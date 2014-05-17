@@ -88,8 +88,8 @@ interrupted() {
 # parse args
 while :; do
     case $1 in
-        -t) TIMEOUT=$2; shift;;
-        -i) INTERVAL=$2; shift;;
+        -t) shift; TIMEOUT=$1;;
+        -i) shift; INTERVAL=$1;;
         -v) VERBOSE=1;;
         -h) help;;
         -* | '') usage;;
