@@ -1,0 +1,121 @@
+#!/bin/sh
+
+# default parameters
+TIMEOUT=10
+INTERVAL=1
+VERBOSE=0
+
+# functions
+usage() {
+    echo "usage: $0 [-t TIMEOUT] [-i INTERVAL] [-vh] COMMAND"
+    exit 2
+}
+
+help() {
+    cat <<==
+NAME
+    await-until -- Await until the specified command becomes success
+
+SYNOPSIS
+    await-until [-t TIMEOUT] [-i INTERVAL] [-vh] COMMAND
+
+DESCRIPTION
+    The options are as follows:
+
+    -t TIMEOUT
+        Specify a timeout in seconds.
+        The default value is $TIMEOUT.
+        
+    -i INTERVAL
+        Wait INTERVAL seconds between executing each COMMAND.
+        The default value is $INTERVAL.
+
+    -v
+        Print verbose messages.
+        The default is 'disabled'.
+
+    -h
+        Print this help message.
+
+    COMMAND
+        Command line for testing.
+        This string will be evaluated with 'eval' command in '/bin/sh'.
+
+EXIT STATUS
+    This command exits with one of following values:
+
+    0       COMMAND returns 0 within TIMEOUT seconds.
+    1       Timed out.
+    >1      An error occurred.
+
+==
+    exit 2
+}
+
+log_message() {
+    if [ $VERBOSE -gt 0 ]; then
+        echo "["`date +%Y-%m-%dT%H:%M:%S%z`"] $1"
+    fi
+}
+
+child_procs() {
+    ps -o pid,ppid | awk '$2 == '$1'{ print $1 }'
+}
+
+killpstree() {
+    for child in `child_procs $1`; do
+        killpstree $child
+    done
+    kill $1
+}
+
+clean_up() {
+    trap - 0
+    killpstree `child_procs $$`
+}
+
+timed_out() {
+    trap - 0
+    log_message "Timed out."
+    exit 1
+}
+
+interrupted() {
+    log_message "Interrupted."
+    exit 3
+}
+
+# parse args
+while :; do
+    case $1 in
+        -t) TIMEOUT=$2 && shift || usage;;
+        -i) INTERVAL=$2 && shift || usage;;
+        -v) VERBOSE=1;;
+        -h) help;;
+        '') usage;;
+        *) break;;
+    esac
+    shift
+done
+
+# set traps
+trap clean_up 0
+trap interrupted 1 2 3 15
+trap timed_out ALRM
+
+# spawn timeout watcher
+sleep $TIMEOUT && kill -s ALRM $$ &
+
+# main loop
+while :; do
+    eval $@
+    ret=$?
+
+    log_message "cmd: $@ => rc: $ret"
+    if [ $ret -eq 0 ]; then
+      log_message "Normal end."
+      exit 0
+    fi
+    sleep $INTERVAL
+done
+
